@@ -1,0 +1,12 @@
+{
+  "appId": "com.anupamkris.dreamdeck",
+  "appName": "dreamdeck",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "url": "http://192.168.199.146:5173"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
