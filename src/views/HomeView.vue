@@ -2,13 +2,16 @@
 import { io } from "socket.io-client";
 import { onMounted, ref } from "vue";
 import { StatusBar, Style } from "@capacitor/status-bar";
-
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import SettingsBox from "@/components/SettingsBox.vue";
 const socket = ref(null);
 const ip = ref("192.168.199.146");
 // const monitors = ref([]);
 
 const brightness = ref({});
 const volume = ref({});
+const iconSize = ref("32");
+
 const currentMode = ref("");
 
 // 192.168.199.19
@@ -16,28 +19,33 @@ const connectSocket = () => {
   socket.value = io("http://" + ip.value + ":8899");
   hideStatusBar();
   socket.value.on("connect", () => {
-    console.log("connected");
+    console.log("CONNECTED");
   });
   socket.value.on("displays", (data) => {
     brightness.value = data;
     console.log("DISPLAYS", data);
+    Haptics.impact({ style: ImpactStyle.Heavy });
+    currentMode.value = "menu";
   });
   socket.value.on("volumes", (data) => {
     volume.value = data;
     console.log("VOLUMES", data);
   });
-  currentMode.value = "menu";
 };
 
 const changeBrightness = (m) => {
   console.log(brightness.value);
   socket.value.emit("brightness", { value: brightness.value[m], mon: m });
+  Haptics.impact({ style: ImpactStyle.Light });
 };
 
 const changeVolume = (m) => {
   console.log(volume.value);
   socket.value.emit("volume", { value: volume.value["master"] });
+  Haptics.impact({ style: ImpactStyle.Light });
 };
+
+const settingsVisible = ref(false);
 
 const setVolume = (m) => {
   if (m == "low") {
@@ -54,18 +62,36 @@ const setVolume = (m) => {
 
 const setProcessVolume = (p) => {
   socket.value.emit("processVolume", { value: volume.value[p], process: p });
+  Haptics.impact({ style: ImpactStyle.Light });
 };
 
 const refreshVolume = () => {
   socket.value.emit("refreshVolume");
+  Haptics.impact({ style: ImpactStyle.Medium });
 };
 
 const launchApp = (app) => {
   socket.value.emit("launchApp", { app: app });
+  Haptics.impact({ style: ImpactStyle.Medium });
+};
+
+const launchWeb = (url) => {
+  socket.value.emit("launchWeb", { url: url });
+  Haptics.impact({ style: ImpactStyle.Medium });
 };
 
 const hideStatusBar = async () => {
   await StatusBar.hide();
+};
+
+const runShortcut = (shortcut) => {
+  socket.value.emit("runShortcut", { shortcut: shortcut });
+  Haptics.impact({ style: ImpactStyle.Medium });
+};
+
+const switchSceneOBS = (scene) => {
+  socket.value.emit("switchSceneOBS", { scene: scene });
+  Haptics.impact({ style: ImpactStyle.Medium });
 };
 
 onMounted(() => {
@@ -82,7 +108,7 @@ onMounted(() => {
     <button
       class="back"
       @click="currentMode = 'menu'"
-      v-if="currentMode != 'menu'"
+      v-if="!['menu', ''].includes(currentMode)"
     >
       <ion-icon name="chevron-back-circle-outline"></ion-icon>
     </button>
@@ -159,24 +185,78 @@ onMounted(() => {
       <button @click="currentMode = 'volume'">
         <ion-icon name="volume-medium-outline"></ion-icon>
       </button>
+      <button @click="switchSceneOBS('Main')">M</button>
+      <button @click="switchSceneOBS('Right')">R</button>
+      <button>..</button>
       <button @click="launchApp('discord')">
-        <ion-icon name="logo-discord"></ion-icon>
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/discord/5865F2"
+        />
       </button>
-      <button>..</button>
-      <button>..</button>
+      <button @click="launchApp('steam')">
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/steam/ffffff"
+        />
+      </button>
+      <button @click="launchApp('epicgameslauncher')">
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/epicgames/ffffff"
+        />
+      </button>
+
+      <button @click="launchApp('OBS Studio')">
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/obsstudio/ffffff"
+        />
+      </button>
+
+      <button @click="launchApp('riotclient')">
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/riotgames/D32936"
+        />
+      </button>
 
       <button>..</button>
-      <button>..</button>
-      <button>..</button>
-      <button>..</button>
-      <button>..</button>
-
-      <button>..</button>
-      <button>..</button>
-      <button>..</button>
-      <button>..</button>
-      <button><ion-icon name="cog-outline"></ion-icon></button>
+      <button>
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/twitch/9146FF"
+        />
+      </button>
+      <button @click="launchWeb('https://youtube.com')">
+        <ion-icon name="logo-youtube" style="color: #ff0000"></ion-icon>
+      </button>
+      <button @click="launchApp('valorant')">
+        <img
+          :height="iconSize"
+          :width="iconSize"
+          src="https://cdn.simpleicons.org/valorant/FA4454"
+        />
+      </button>
+      <button @click="settingsVisible = true">
+        <ion-icon name="cog-outline"></ion-icon>
+      </button>
     </div>
+    <div class="loading" v-if="currentMode == '' && socket">
+      <!-- <div class="loading"> -->
+      <div class="progressbar">
+        <div class="inner"></div>
+      </div>
+      Connecting to Server Please Wait...
+    </div>
+
+    <SettingsBox v-if="settingsVisible" @close="settingsVisible = false" />
   </main>
 </template>
 
@@ -233,7 +313,7 @@ main {
 
       outline: none;
       border: none;
-      background-color: #222222;
+      background-color: #141414;
       color: #fff;
       font-size: 24px;
     }
@@ -325,13 +405,13 @@ main {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: #141414;
+  background: #000000;
 
   input {
     height: 50px;
     width: 300px;
     border-radius: 10px;
-    border: 1px solid #222222;
+    border: 1px solid #141414;
     background: #3a3a3a;
     color: #ffffff;
     outline: none;
@@ -348,7 +428,7 @@ main {
     border-radius: 10px;
     border: none;
     outline: none;
-    background-color: #222222;
+    background-color: #141414;
     color: #fff;
     font-size: 24px;
     font-weight: bold;
@@ -365,12 +445,12 @@ main {
   height: 100%;
   width: 100%;
 
-  background: #141414;
+  background: #000000;
 
   button {
     width: calc(20% - 25px);
     height: 27%;
-    background-color: #222222;
+    background-color: #141414;
     color: #fff;
     font-size: 36px;
     font-weight: bold;
@@ -420,5 +500,50 @@ main {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.loading {
+  height: 100%;
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #000000;
+  color: #fff;
+
+  .progressbar {
+    width: 80%;
+    height: 60px;
+    background-color: #222;
+    border-radius: 10px;
+    margin-bottom: 20px;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    .inner {
+      width: 0%;
+      height: 100%;
+      background-color: #0088ff;
+      border-radius: 10px;
+
+      animation: progress 5s ease-in-out infinite;
+    }
+  }
+}
+
+@keyframes progress {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
 }
 </style>
